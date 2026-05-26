@@ -51,6 +51,12 @@ type SettingsResponse = {
   targetKeywords: SettingItem[];
 };
 
+type FeedbackType =
+  | "should_show"
+  | "should_mask"
+  | "should_exclude"
+  | "wrong_context";
+
 const settingTypes = [
   { value: "source_account", label: "収集対象アカウント" },
   { value: "block_account", label: "ブロック対象アカウント" },
@@ -80,6 +86,11 @@ function getStatusClass(classification?: Classification) {
   return "border-gray-200 bg-gray-50 text-gray-600";
 }
 
+function buildXPostUrl(post: Post) {
+  const username = post.author_handle.replace(/^@/, "");
+  return `https://x.com/${username}/status/${post.x_post_id}`;
+}
+
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
@@ -88,6 +99,8 @@ export default function Home() {
   const [newType, setNewType] = useState("source_account");
   const [newValue, setNewValue] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [isBulkMode, setIsBulkMode] = useState(true);
+  const [feedbackNotes, setFeedbackNotes] = useState<Record<string, string>>({});
   const [showMaskedText, setShowMaskedText] = useState<Record<string, boolean>>(
     {}
   );
@@ -202,7 +215,7 @@ export default function Home() {
   async function addSetting() {
     try {
       setLoading(true);
-      setMessage("設定を追加中...");
+      setMessage(isBulkMode ? "設定を一括追加中..." : "設定を追加中...");
 
       const response = await fetch("/api/settings", {
         method: "POST",
@@ -213,6 +226,7 @@ export default function Home() {
           type: newType,
           value: newValue,
           description: newDescription,
+          mode: isBulkMode ? "bulk" : "single",
         }),
       });
 
@@ -224,7 +238,7 @@ export default function Home() {
 
       setNewValue("");
       setNewDescription("");
-      setMessage("設定を追加しました");
+      setMessage(`設定を追加しました: ${json.added ?? 1}件`);
       await loadSettings();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -233,12 +247,11 @@ export default function Home() {
     }
   }
 
-  async function sendFeedback(
-    postId: string,
-    feedback: "should_show" | "should_mask" | "should_exclude" | "wrong_context"
-  ) {
+  async function sendFeedback(postId: string, feedback: FeedbackType) {
     try {
       setLoading(true);
+
+      const note = feedbackNotes[postId] ?? "";
 
       const response = await fetch("/api/feedback", {
         method: "POST",
@@ -248,6 +261,7 @@ export default function Home() {
         body: JSON.stringify({
           postId,
           feedback,
+          note,
         }),
       });
 
@@ -267,6 +281,7 @@ export default function Home() {
               : "文脈違い";
 
       setMessage(`フィードバックを保存しました: ${feedbackLabel}`);
+      setFeedbackNotes((current) => ({ ...current, [postId]: "" }));
       await loadPosts();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -389,12 +404,30 @@ export default function Home() {
                   ))}
                 </select>
 
-                <input
-                  value={newValue}
-                  onChange={(event) => setNewValue(event.target.value)}
-                  placeholder="@account または キーワード"
-                  className="rounded-2xl border border-gray-200 px-4 py-3 text-sm"
-                />
+                <label className="flex items-center gap-2 text-sm font-bold text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={isBulkMode}
+                    onChange={(event) => setIsBulkMode(event.target.checked)}
+                  />
+                  複数行を一括追加する
+                </label>
+
+                {isBulkMode ? (
+                  <textarea
+                    value={newValue}
+                    onChange={(event) => setNewValue(event.target.value)}
+                    placeholder={"@account1\n@account2\n@account3"}
+                    className="min-h-36 rounded-2xl border border-gray-200 px-4 py-3 text-sm"
+                  />
+                ) : (
+                  <input
+                    value={newValue}
+                    onChange={(event) => setNewValue(event.target.value)}
+                    placeholder="@account または キーワード"
+                    className="rounded-2xl border border-gray-200 px-4 py-3 text-sm"
+                  />
+                )}
 
                 {newType === "target_keyword" ? (
                   <textarea
@@ -410,7 +443,7 @@ export default function Home() {
                   disabled={loading || !newValue.trim()}
                   className="rounded-full bg-black px-5 py-3 text-sm font-bold text-white disabled:opacity-40"
                 >
-                  追加する
+                  {isBulkMode ? "一括追加する" : "追加する"}
                 </button>
               </div>
             </div>
@@ -488,6 +521,7 @@ export default function Home() {
                 classification?.classification === "mask" ||
                 classification?.classification === "exclude";
               const canShowText = !isMasked || showMaskedText[post.id];
+              const postUrl = buildXPostUrl(post);
 
               return (
                 <article
@@ -514,6 +548,14 @@ export default function Home() {
                           : "キーワード検索"}
                         {post.source_label ? `: ${post.source_label}` : ""}
                       </p>
+                      <a
+                        href={postUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-flex rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-200"
+                      >
+                        元のX投稿を開く
+                      </a>
                     </div>
 
                     <span
@@ -555,6 +597,8 @@ export default function Home() {
                                     poster={media.preview_image_url ?? undefined}
                                     controls
                                     playsInline
+                                    loop={media.type === "animated_gif"}
+                                    muted={media.type === "animated_gif"}
                                     className="max-h-[720px] w-full bg-black object-contain"
                                   />
                                 ) : null}
@@ -563,11 +607,16 @@ export default function Home() {
                                   media.type === "animated_gif") &&
                                 !media.video_url &&
                                 media.preview_image_url ? (
-                                  <img
-                                    src={media.preview_image_url}
-                                    alt=""
-                                    className="max-h-[720px] w-full object-contain"
-                                  />
+                                  <div className="relative">
+                                    <img
+                                      src={media.preview_image_url}
+                                      alt=""
+                                      className="max-h-[720px] w-full object-contain"
+                                    />
+                                    <div className="absolute inset-x-0 bottom-0 bg-black/70 px-4 py-3 text-xs font-bold text-white">
+                                      動画URLを取得できなかったため、プレビュー画像を表示しています。元投稿から動画を確認できます。
+                                    </div>
+                                  </div>
                                 ) : null}
                               </div>
                             ))}
@@ -622,6 +671,19 @@ export default function Home() {
                     <p className="mb-3 text-xs font-bold text-gray-500">
                       この判定へのフィードバック
                     </p>
+
+                    <textarea
+                      value={feedbackNotes[post.id] ?? ""}
+                      onChange={(event) =>
+                        setFeedbackNotes((current) => ({
+                          ...current,
+                          [post.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="例：ジス本人ではなく他メンバーを褒めているため隠したい / 心配系の文脈なので見たくない など"
+                      className="mb-3 min-h-20 w-full rounded-2xl border border-gray-200 px-4 py-3 text-sm"
+                    />
+
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => sendFeedback(post.id, "should_show")}

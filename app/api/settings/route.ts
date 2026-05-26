@@ -1,6 +1,74 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+function normalizeHandle(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+}
+
+function splitBulkText(value: string) {
+  return value
+    .split(/\n|,|、|\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function upsertSettingItem(type: string, value: string, description?: string) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) return;
+
+  if (type === "source_account") {
+    const handle = normalizeHandle(normalizedValue);
+
+    const { error } = await supabaseAdmin
+      .from("x_source_accounts")
+      .upsert({ handle, is_active: true }, { onConflict: "handle" });
+
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (type === "block_account") {
+    const handle = normalizeHandle(normalizedValue);
+
+    const { error } = await supabaseAdmin
+      .from("x_block_accounts")
+      .upsert({ handle, is_active: true }, { onConflict: "handle" });
+
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (type === "mute_word") {
+    const { error } = await supabaseAdmin
+      .from("mute_words")
+      .upsert({ word: normalizedValue, is_active: true }, { onConflict: "word" });
+
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (type === "target_keyword") {
+    const { error } = await supabaseAdmin
+      .from("target_keywords")
+      .upsert(
+        {
+          keyword: normalizedValue,
+          description: description ?? null,
+          is_active: true,
+        },
+        { onConflict: "keyword" }
+      );
+
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  throw new Error("invalid type");
+}
+
 export async function GET() {
   const [
     sourceAccounts,
@@ -41,72 +109,35 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { type, value, description } = body;
+  try {
+    const body = await request.json();
+    const { type, value, description, mode } = body;
 
-  if (!type || !value) {
-    return NextResponse.json(
-      { error: "type and value are required" },
-      { status: 400 }
-    );
-  }
-
-  const normalizedValue =
-    typeof value === "string" ? value.trim() : String(value).trim();
-
-  if (!normalizedValue) {
-    return NextResponse.json(
-      { error: "value is empty" },
-      { status: 400 }
-    );
-  }
-
-  if (type === "source_account") {
-    const handle = normalizedValue.startsWith("@")
-      ? normalizedValue
-      : `@${normalizedValue}`;
-
-    const { error } = await supabaseAdmin
-      .from("x_source_accounts")
-      .upsert({ handle, is_active: true }, { onConflict: "handle" });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  if (type === "block_account") {
-    const handle = normalizedValue.startsWith("@")
-      ? normalizedValue
-      : `@${normalizedValue}`;
-
-    const { error } = await supabaseAdmin
-      .from("x_block_accounts")
-      .upsert({ handle, is_active: true }, { onConflict: "handle" });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  if (type === "mute_word") {
-    const { error } = await supabaseAdmin
-      .from("mute_words")
-      .upsert({ word: normalizedValue, is_active: true }, { onConflict: "word" });
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  if (type === "target_keyword") {
-    const { error } = await supabaseAdmin
-      .from("target_keywords")
-      .upsert(
-        {
-          keyword: normalizedValue,
-          description: description ?? null,
-          is_active: true,
-        },
-        { onConflict: "keyword" }
+    if (!type || !value) {
+      return NextResponse.json(
+        { error: "type and value are required" },
+        { status: 400 }
       );
+    }
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const values = mode === "bulk" ? splitBulkText(String(value)) : [String(value)];
+
+    if (values.length === 0) {
+      return NextResponse.json({ error: "value is empty" }, { status: 400 });
+    }
+
+    for (const item of values) {
+      await upsertSettingItem(type, item, description);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      added: values.length,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ ok: true });
 }

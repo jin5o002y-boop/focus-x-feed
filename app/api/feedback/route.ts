@@ -8,11 +8,13 @@ const allowedFeedback = new Set([
   "wrong_context",
 ]);
 
-function feedbackToClassification(feedback: string) {
+function feedbackToClassification(feedback: string, note?: string) {
+  const suffix = note ? ` / 補足: ${note}` : "";
+
   if (feedback === "should_show") {
     return {
       classification: "show",
-      reason: "ユーザーが「これは見たい」とフィードバックしたため表示に変更",
+      reason: `ユーザーが「これは見たい」とフィードバックしたため表示に変更${suffix}`,
       sentiment: "positive",
       is_target_context: true,
       main_subject: "ユーザーフィードバックにより表示対象",
@@ -22,7 +24,7 @@ function feedbackToClassification(feedback: string) {
   if (feedback === "should_mask") {
     return {
       classification: "mask",
-      reason: "ユーザーが「これは隠したい」とフィードバックしたためマスキングに変更",
+      reason: `ユーザーが「これは隠したい」とフィードバックしたためマスキングに変更${suffix}`,
       sentiment: "other",
       is_target_context: true,
       main_subject: "ユーザーフィードバックによりマスキング対象",
@@ -32,7 +34,7 @@ function feedbackToClassification(feedback: string) {
   if (feedback === "should_exclude") {
     return {
       classification: "exclude",
-      reason: "ユーザーが「これは除外でいい」とフィードバックしたため除外に変更",
+      reason: `ユーザーが「これは除外でいい」とフィードバックしたため除外に変更${suffix}`,
       sentiment: "other",
       is_target_context: false,
       main_subject: "ユーザーフィードバックにより除外対象",
@@ -42,7 +44,7 @@ function feedbackToClassification(feedback: string) {
   if (feedback === "wrong_context") {
     return {
       classification: "exclude",
-      reason: "ユーザーが「文脈違い」とフィードバックしたため除外に変更",
+      reason: `ユーザーが「文脈違い」とフィードバックしたため除外に変更${suffix}`,
       sentiment: "other",
       is_target_context: false,
       main_subject: "文脈違い",
@@ -71,7 +73,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const classificationUpdate = feedbackToClassification(feedback);
+    const safeNote = typeof note === "string" ? note.trim() : "";
+    const classificationUpdate = feedbackToClassification(feedback, safeNote);
 
     if (!classificationUpdate) {
       return NextResponse.json(
@@ -85,7 +88,7 @@ export async function POST(request: Request) {
       .insert({
         post_id: postId,
         feedback,
-        note: note ?? null,
+        note: safeNote || null,
       });
 
     if (feedbackError) {
