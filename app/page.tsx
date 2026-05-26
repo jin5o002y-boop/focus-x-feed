@@ -32,6 +32,7 @@ type Post = {
   source_type: "source_account" | "keyword_search";
   source_label: string | null;
   media: MediaItem[] | null;
+  is_archived: boolean;
   post_classifications: Classification[] | null;
 };
 
@@ -49,6 +50,17 @@ type SettingsResponse = {
   blockAccounts: SettingItem[];
   muteWords: SettingItem[];
   targetKeywords: SettingItem[];
+};
+
+type CronLog = {
+  id: string;
+  job_name: string;
+  status: "success" | "error";
+  fetch_result: any;
+  classify_result: any;
+  error_message: string | null;
+  started_at: string;
+  finished_at: string | null;
 };
 
 type CronLog = {
@@ -130,6 +142,7 @@ export default function Home() {
   const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
   const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
   const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
+  const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [newType, setNewType] = useState("source_account");
@@ -141,7 +154,7 @@ export default function Home() {
     {}
   );
   const [activeFilter, setActiveFilter] = useState<
-    "all" | "show" | "mask" | "exclude" | "unclassified" | "media"
+    "all" | "show" | "mask" | "exclude" | "unclassified" | "media" | "archived"
   >("all");
 
   const counts = useMemo(() => {
@@ -153,13 +166,22 @@ export default function Home() {
       unknown: 0,
       unclassified: 0,
       media: 0,
+      archived: 0,
     };
 
     for (const post of posts) {
       const classification = post.post_classifications?.[0];
 
+      if (post.is_archived) {
+        result.archived += 1;
+      }
+
       if (post.media && post.media.length > 0) {
         result.media += 1;
+      }
+
+      if (post.is_archived) {
+        continue;
       }
 
       if (!classification) {
@@ -182,6 +204,8 @@ export default function Home() {
     return posts.filter((post) => {
       const classification = post.post_classifications?.[0];
 
+      if (activeFilter === "archived") return post.is_archived;
+      if (post.is_archived) return false;
       if (activeFilter === "all") return true;
       if (activeFilter === "media") return Boolean(post.media && post.media.length > 0);
       if (activeFilter === "unclassified") return !classification;
@@ -196,6 +220,7 @@ export default function Home() {
     { value: "exclude", label: "除外", count: counts.exclude },
     { value: "unclassified", label: "未判定", count: counts.unclassified },
     { value: "media", label: "画像・動画あり", count: counts.media },
+    { value: "archived", label: "アーカイブ済み", count: counts.archived },
   ] as const;
 
   async function loadPosts() {
@@ -218,6 +243,17 @@ export default function Home() {
     }
 
     setSettings(json);
+  }
+
+  async function loadCronLogs() {
+    const response = await fetch("/api/cron-logs", { cache: "no-store" });
+    const json = await response.json();
+
+    if (!response.ok) {
+      throw new Error(json.error ?? "Cronログの取得に失敗しました");
+    }
+
+    setCronLogs(json.logs ?? []);
   }
 
   async function loadCronLogs() {
@@ -277,6 +313,7 @@ export default function Home() {
       await loadCronLogs();
       await loadCronLogs();
       await loadCronLogs();
+      await loadCronLogs();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -312,6 +349,37 @@ export default function Home() {
       setNewDescription("");
       setMessage(`設定を追加しました: ${json.added ?? 1}件`);
       await loadSettings();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updateArchive(postId: string, isArchived: boolean) {
+    try {
+      setLoading(true);
+      setMessage(isArchived ? "投稿をアーカイブ中..." : "アーカイブを解除中...");
+
+      const response = await fetch("/api/archive", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          postId,
+          isArchived,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.error ?? "アーカイブ更新に失敗しました");
+      }
+
+      setMessage(isArchived ? "投稿をアーカイブしました" : "アーカイブを解除しました");
+      await loadPosts();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -737,13 +805,23 @@ export default function Home() {
                       </a>
                     </div>
 
-                    <span
-                      className={`rounded-full border px-3 py-1 text-xs font-bold ${getStatusClass(
-                        classification
-                      )}`}
-                    >
-                      {getStatusLabel(classification)}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => updateArchive(post.id, !post.is_archived)}
+                        disabled={loading}
+                        className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700 hover:bg-gray-200 disabled:opacity-40"
+                      >
+                        {post.is_archived ? "アーカイブ解除" : "アーカイブ"}
+                      </button>
+
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-bold ${getStatusClass(
+                          classification
+                        )}`}
+                      >
+                        {post.is_archived ? "アーカイブ済み" : getStatusLabel(classification)}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="mt-5 rounded-2xl bg-gray-50 p-5">
