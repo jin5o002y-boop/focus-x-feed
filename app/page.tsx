@@ -314,17 +314,29 @@ export default function Home() {
                 AI判定する
               </button>
               <button
-                onClick={() => {
-                  loadPosts().catch((error) =>
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    setMessage("再読み込み中...");
+                    await loadPosts();
+                    await loadSettings();
+                    setMessage("再読み込みしました");
+                  } catch (error) {
                     setMessage(
                       error instanceof Error ? error.message : String(error)
-                    )
-                  );
+                    );
+                  } finally {
+                    setLoading(false);
+                  }
                 }}
                 disabled={loading}
-                className="rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-bold text-gray-800 disabled:opacity-40"
+                className={`rounded-full border px-5 py-3 text-sm font-bold transition disabled:opacity-40 ${
+                  loading
+                    ? "border-gray-300 bg-gray-200 text-gray-500"
+                    : "border-gray-300 bg-white text-gray-800 hover:bg-gray-100 active:bg-gray-200"
+                }`}
               >
-                再読み込み
+                {loading ? "処理中..." : "再読み込み"}
               </button>
             </div>
           </div>
