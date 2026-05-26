@@ -13,10 +13,11 @@ export async function GET() {
       posted_at,
       source_type,
       source_label,
-      media
+      media,
+      is_archived
     `)
     .order("posted_at", { ascending: false })
-    .limit(100);
+    .limit(200);
 
   if (postsError) {
     return NextResponse.json({ error: postsError.message }, { status: 500 });

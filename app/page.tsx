@@ -52,50 +52,6 @@ type SettingsResponse = {
   targetKeywords: SettingItem[];
 };
 
-type CronLog = {
-  id: string;
-  job_name: string;
-  status: "success" | "error";
-  fetch_result: any;
-  classify_result: any;
-  error_message: string | null;
-  started_at: string;
-  finished_at: string | null;
-};
-
-type CronLog = {
-  id: string;
-  job_name: string;
-  status: "success" | "error";
-  fetch_result: any;
-  classify_result: any;
-  error_message: string | null;
-  started_at: string;
-  finished_at: string | null;
-};
-
-type CronLog = {
-  id: string;
-  job_name: string;
-  status: "success" | "error";
-  fetch_result: any;
-  classify_result: any;
-  error_message: string | null;
-  started_at: string;
-  finished_at: string | null;
-};
-
-type CronLog = {
-  id: string;
-  job_name: string;
-  status: "success" | "error";
-  fetch_result: any;
-  classify_result: any;
-  error_message: string | null;
-  started_at: string;
-  finished_at: string | null;
-};
-
 type FeedbackType =
   | "should_show"
   | "should_mask"
@@ -139,10 +95,6 @@ function buildXPostUrl(post: Post) {
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
-  const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
-  const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
-  const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
-  const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [newType, setNewType] = useState("source_account");
@@ -154,7 +106,7 @@ export default function Home() {
     {}
   );
   const [activeFilter, setActiveFilter] = useState<
-    "all" | "show" | "mask" | "exclude" | "unclassified" | "media" | "archived"
+    "all" | "show" | "mask" | "exclude" | "unclassified" | "media" | "archived" | "archived"
   >("all");
 
   const counts = useMemo(() => {
@@ -206,6 +158,8 @@ export default function Home() {
 
       if (activeFilter === "archived") return post.is_archived;
       if (post.is_archived) return false;
+      if (activeFilter === "archived") return post.is_archived;
+      if (post.is_archived) return false;
       if (activeFilter === "all") return true;
       if (activeFilter === "media") return Boolean(post.media && post.media.length > 0);
       if (activeFilter === "unclassified") return !classification;
@@ -245,50 +199,6 @@ export default function Home() {
     setSettings(json);
   }
 
-  async function loadCronLogs() {
-    const response = await fetch("/api/cron-logs", { cache: "no-store" });
-    const json = await response.json();
-
-    if (!response.ok) {
-      throw new Error(json.error ?? "Cronログの取得に失敗しました");
-    }
-
-    setCronLogs(json.logs ?? []);
-  }
-
-  async function loadCronLogs() {
-    const response = await fetch("/api/cron-logs", { cache: "no-store" });
-    const json = await response.json();
-
-    if (!response.ok) {
-      throw new Error(json.error ?? "Cronログの取得に失敗しました");
-    }
-
-    setCronLogs(json.logs ?? []);
-  }
-
-  async function loadCronLogs() {
-    const response = await fetch("/api/cron-logs", { cache: "no-store" });
-    const json = await response.json();
-
-    if (!response.ok) {
-      throw new Error(json.error ?? "Cronログの取得に失敗しました");
-    }
-
-    setCronLogs(json.logs ?? []);
-  }
-
-  async function loadCronLogs() {
-    const response = await fetch("/api/cron-logs", { cache: "no-store" });
-    const json = await response.json();
-
-    if (!response.ok) {
-      throw new Error(json.error ?? "Cronログの取得に失敗しました");
-    }
-
-    setCronLogs(json.logs ?? []);
-  }
-
   async function runAction(
     endpoint: "/api/fetch" | "/api/classify",
     label: string
@@ -310,10 +220,6 @@ export default function Home() {
       setMessage(`${label}完了: ${JSON.stringify(json)}`);
       await loadPosts();
       await loadSettings();
-      await loadCronLogs();
-      await loadCronLogs();
-      await loadCronLogs();
-      await loadCronLogs();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -462,7 +368,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    Promise.all([loadPosts(), loadSettings(), loadCronLogs()]).catch((error) => {
+    Promise.all([loadPosts(), loadSettings()]).catch((error) => {
       setMessage(error instanceof Error ? error.message : String(error));
     });
   }, []);
@@ -506,7 +412,6 @@ export default function Home() {
                     setMessage("再読み込み中...");
                     await loadPosts();
                     await loadSettings();
-                    await loadCronLogs();
                     setMessage("再読み込みしました");
                   } catch (error) {
                     setMessage(
@@ -653,73 +558,6 @@ export default function Home() {
                   onRemove={removeSetting}
                   max={12}
                 />
-              </div>
-            </div>
-
-            <div className="rounded-3xl bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-lg font-bold">Cron実行ログ</h2>
-                <button
-                  onClick={() => loadCronLogs().catch((error) =>
-                    setMessage(error instanceof Error ? error.message : String(error))
-                  )}
-                  className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-600 hover:bg-gray-200"
-                >
-                  更新
-                </button>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                {cronLogs.length === 0 ? (
-                  <p className="text-sm text-gray-500">
-                    まだ実行ログがありません。
-                  </p>
-                ) : null}
-
-                {cronLogs.map((log) => {
-                  const fetchCount =
-                    Number(log.fetch_result?.savedFromAccounts ?? 0) +
-                    Number(log.fetch_result?.savedFromKeywords ?? 0);
-                  const classifiedCount =
-                    Number(log.classify_result?.classified ?? 0);
-
-                  return (
-                    <div
-                      key={log.id}
-                      className="rounded-2xl border border-gray-100 bg-gray-50 p-4 text-xs"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`rounded-full px-2 py-1 font-bold ${
-                            log.status === "success"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {log.status === "success" ? "成功" : "エラー"}
-                        </span>
-                        <span className="text-gray-400">
-                          {new Date(log.started_at).toLocaleString("ja-JP")}
-                        </span>
-                      </div>
-
-                      {log.status === "success" ? (
-                        <div className="mt-3 grid gap-1 text-gray-600">
-                          <p>取得: {fetchCount}件</p>
-                          <p>判定: {classifiedCount}件</p>
-                          <p>
-                            FB参照:{" "}
-                            {log.classify_result?.feedbackExamplesUsed ?? 0}件
-                          </p>
-                        </div>
-                      ) : (
-                        <p className="mt-3 leading-5 text-red-700">
-                          {log.error_message}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
               </div>
             </div>
           </aside>
