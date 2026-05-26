@@ -73,6 +73,17 @@ type CronLog = {
   finished_at: string | null;
 };
 
+type CronLog = {
+  id: string;
+  job_name: string;
+  status: "success" | "error";
+  fetch_result: any;
+  classify_result: any;
+  error_message: string | null;
+  started_at: string;
+  finished_at: string | null;
+};
+
 type FeedbackType =
   | "should_show"
   | "should_mask"
@@ -116,6 +127,7 @@ function buildXPostUrl(post: Post) {
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
+  const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
   const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
   const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
   const [loading, setLoading] = useState(false);
@@ -230,6 +242,17 @@ export default function Home() {
     setCronLogs(json.logs ?? []);
   }
 
+  async function loadCronLogs() {
+    const response = await fetch("/api/cron-logs", { cache: "no-store" });
+    const json = await response.json();
+
+    if (!response.ok) {
+      throw new Error(json.error ?? "Cronログの取得に失敗しました");
+    }
+
+    setCronLogs(json.logs ?? []);
+  }
+
   async function runAction(
     endpoint: "/api/fetch" | "/api/classify",
     label: string
@@ -251,6 +274,7 @@ export default function Home() {
       setMessage(`${label}完了: ${JSON.stringify(json)}`);
       await loadPosts();
       await loadSettings();
+      await loadCronLogs();
       await loadCronLogs();
       await loadCronLogs();
     } catch (error) {
