@@ -247,6 +247,37 @@ export default function Home() {
     }
   }
 
+  async function removeSetting(type: string, id: string) {
+    try {
+      setLoading(true);
+      setMessage("設定を削除中...");
+
+      const response = await fetch("/api/settings", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type,
+          id,
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        throw new Error(json.error ?? "設定削除に失敗しました");
+      }
+
+      setMessage("設定を削除しました");
+      await loadSettings();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function sendFeedback(postId: string, feedback: FeedbackType) {
     try {
       setLoading(true);
@@ -456,21 +487,29 @@ export default function Home() {
                   title="収集対象アカウント"
                   items={settings?.sourceAccounts ?? []}
                   field="handle"
+                  type="source_account"
+                  onRemove={removeSetting}
                 />
                 <SettingBlock
                   title="キーワード"
                   items={settings?.targetKeywords ?? []}
                   field="keyword"
+                  type="target_keyword"
+                  onRemove={removeSetting}
                 />
                 <SettingBlock
                   title="ミュートワード"
                   items={settings?.muteWords ?? []}
                   field="word"
+                  type="mute_word"
+                  onRemove={removeSetting}
                 />
                 <SettingBlock
                   title="ブロック対象"
                   items={settings?.blockAccounts ?? []}
                   field="handle"
+                  type="block_account"
+                  onRemove={removeSetting}
                   max={12}
                 />
               </div>
@@ -729,11 +768,15 @@ function SettingBlock({
   title,
   items,
   field,
+  type,
+  onRemove,
   max = 20,
 }: {
   title: string;
   items: SettingItem[];
   field: "handle" | "word" | "keyword";
+  type: "source_account" | "block_account" | "mute_word" | "target_keyword";
+  onRemove: (type: string, id: string) => void;
   max?: number;
 }) {
   return (
@@ -747,9 +790,18 @@ function SettingBlock({
         {items.slice(0, max).map((item) => (
           <span
             key={item.id}
-            className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700"
+            className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700"
           >
-            {String(item[field] ?? "")}
+            <span>{String(item[field] ?? "")}</span>
+            <button
+              type="button"
+              onClick={() => onRemove(type, item.id)}
+              className="grid h-4 w-4 place-items-center rounded-full bg-gray-300 text-[10px] font-bold text-white hover:bg-red-500"
+              aria-label="削除"
+              title="削除"
+            >
+              ×
+            </button>
           </span>
         ))}
         {items.length > max ? (

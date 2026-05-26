@@ -14,6 +14,14 @@ function splitBulkText(value: string) {
     .filter(Boolean);
 }
 
+function getTableName(type: string) {
+  if (type === "source_account") return "x_source_accounts";
+  if (type === "block_account") return "x_block_accounts";
+  if (type === "mute_word") return "mute_words";
+  if (type === "target_keyword") return "target_keywords";
+  return null;
+}
+
 async function upsertSettingItem(type: string, value: string, description?: string) {
   const normalizedValue = value.trim();
 
@@ -77,10 +85,26 @@ export async function GET() {
     targetKeywords,
     appSettings,
   ] = await Promise.all([
-    supabaseAdmin.from("x_source_accounts").select("*").order("created_at"),
-    supabaseAdmin.from("x_block_accounts").select("*").order("created_at"),
-    supabaseAdmin.from("mute_words").select("*").order("created_at"),
-    supabaseAdmin.from("target_keywords").select("*").order("created_at"),
+    supabaseAdmin
+      .from("x_source_accounts")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at"),
+    supabaseAdmin
+      .from("x_block_accounts")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at"),
+    supabaseAdmin
+      .from("mute_words")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at"),
+    supabaseAdmin
+      .from("target_keywords")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at"),
     supabaseAdmin.from("app_settings").select("*"),
   ]);
 
@@ -134,6 +158,45 @@ export async function POST(request: Request) {
       ok: true,
       added: values.length,
     });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const { type, id } = body;
+
+    if (!type || !id) {
+      return NextResponse.json(
+        { error: "type and id are required" },
+        { status: 400 }
+      );
+    }
+
+    const tableName = getTableName(type);
+
+    if (!tableName) {
+      return NextResponse.json(
+        { error: "invalid type" },
+        { status: 400 }
+      );
+    }
+
+    const { error } = await supabaseAdmin
+      .from(tableName)
+      .update({ is_active: false })
+      .eq("id", id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : String(error) },
