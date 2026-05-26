@@ -46,6 +46,57 @@ type ClassificationResult = {
   main_subject: string;
 };
 
+type FeedbackExample = {
+  feedback: string;
+  note: string | null;
+  post_text: string | null;
+  author_handle: string | null;
+};
+
+function buildFeedbackGuide(examples: FeedbackExample[]) {
+  if (examples.length === 0) {
+    return `
+過去のユーザーフィードバック：
+まだありません。
+`;
+  }
+
+  const lines = examples
+    .map((example, index) => {
+      const label =
+        example.feedback === "should_show"
+          ? "表示したい"
+          : example.feedback === "should_mask"
+            ? "マスキングしたい"
+            : example.feedback === "should_exclude"
+              ? "除外したい"
+              : "文脈違いとして除外したい";
+
+      const note = example.note?.trim()
+        ? example.note.trim()
+        : "理由メモなし";
+
+      const text = example.post_text
+        ? example.post_text.replace(/\s+/g, " ").slice(0, 160)
+        : "";
+
+      return `${index + 1}. 判定補正: ${label}
+理由メモ: ${note}
+投稿者: ${example.author_handle ?? ""}
+投稿例: ${text}`;
+    })
+    .join("\n\n");
+
+  return `
+過去のユーザーフィードバック：
+以下は、ユーザーが実際に判定を修正した履歴です。
+新しい投稿を判定するときは、この履歴を強く参考にしてください。
+ただし、完全一致ではなく、同じ文脈・同じニュアンス・同じ主語ズレ・同じ不安視表現がある場合に反映してください。
+
+${lines}
+`;
+}
+
 async function classifyPost(input: {
   text: string;
   authorHandle: string;
@@ -55,6 +106,7 @@ async function classifyPost(input: {
   sourceLabel: string | null;
   keywords: string[];
   muteWords: string[];
+  feedbackGuide: string;
 }): Promise<ClassificationResult> {
   const prompt = `
 あなたはX投稿のフィルタリング判定AIです。
@@ -66,6 +118,8 @@ ${showRule}
 
 ${maskRule}
 
+${input.feedbackGuide}
+
 判定ルール：
 1. ミュートワードを含む投稿は exclude。
 2. HANAのジスではない別対象の投稿は exclude。
@@ -74,6 +128,9 @@ ${maskRule}
 5. 一見ジスを褒めていても主語や称賛対象が他者に移っている投稿は mask。
 6. 判断に迷う場合は unknown ではなく、ユーザーの安全側に倒して mask。
 7. 収集対象アカウントの投稿でも、mask条件に当てはまる場合は mask。
+8. 過去のユーザーフィードバックに似た文脈がある場合は、その判断を優先する。
+9. 「除外」は対象外・別界隈・文脈違い・ミュート対象に使う。
+10. 「マスキング」は対象には関係あるが、ユーザーが見たくない可能性が高い投稿に使う。
 
 出力はJSONのみ。
 余計な説明は一切出さないでください。
@@ -81,7 +138,7 @@ ${maskRule}
 JSON形式：
 {
   "classification": "show | mask | exclude | unknown",
-  "reason": "短い判定理由",
+  "reason": "短い判定理由。過去フィードバックを参考にした場合はその要点も含める",
   "matched_keywords": ["一致したキーワード"],
   "matched_mute_words": ["一致したミュートワード"],
   "is_target_context": true,
@@ -130,19 +187,49 @@ ${input.text}
 
 export async function POST() {
   try {
-    const [classifiedResult, keywordsResult, muteWordsResult] =
-      await Promise.all([
-        supabaseAdmin.from("post_classifications").select("post_id"),
-        supabaseAdmin
-          .from("target_keywords")
-          .select("keyword")
-          .eq("is_active", true),
-        supabaseAdmin.from("mute_words").select("word").eq("is_active", true),
-      ]);
+    const [
+      classifiedResult,
+      keywordsResult,
+      muteWordsResult,
+      feedbackResult,
+    ] = await Promise.all([
+      supabaseAdmin.from("post_classifications").select("post_id"),
+      supabaseAdmin
+        .from("target_keywords")
+        .select("keyword")
+        .eq("is_active", true),
+      supabaseAdmin.from("mute_words").select("word").eq("is_active", true),
+      supabaseAdmin
+        .from("user_feedback")
+        .select(`
+          feedback,
+          note,
+          created_at,
+          x_posts (
+            text,
+            author_handle
+          )
+        `)
+        .not("note", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(30),
+    ]);
 
     if (classifiedResult.error) throw new Error(classifiedResult.error.message);
     if (keywordsResult.error) throw new Error(keywordsResult.error.message);
     if (muteWordsResult.error) throw new Error(muteWordsResult.error.message);
+    if (feedbackResult.error) throw new Error(feedbackResult.error.message);
+
+    const feedbackExamples: FeedbackExample[] = (feedbackResult.data ?? []).map(
+      (item: any) => ({
+        feedback: item.feedback,
+        note: item.note,
+        post_text: item.x_posts?.text ?? null,
+        author_handle: item.x_posts?.author_handle ?? null,
+      })
+    );
+
+    const feedbackGuide = buildFeedbackGuide(feedbackExamples);
 
     const classifiedPostIds = new Set(
       (classifiedResult.data ?? []).map((item) => item.post_id)
@@ -186,6 +273,7 @@ export async function POST() {
           sourceLabel: post.source_label,
           keywords,
           muteWords,
+          feedbackGuide,
         });
 
         const { error } = await supabaseAdmin
@@ -217,6 +305,7 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       classified,
+      feedbackExamplesUsed: feedbackExamples.length,
       remainingBeforeThisRun: Math.max(
         0,
         (candidatePosts ?? []).filter((post) => !classifiedPostIds.has(post.id))
