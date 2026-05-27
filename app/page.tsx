@@ -158,11 +158,10 @@ export default function Home() {
 
       if (activeFilter === "archived") return post.is_archived;
       if (post.is_archived) return false;
-      if (activeFilter === "archived") return post.is_archived;
-      if (post.is_archived) return false;
       if (activeFilter === "all") return true;
       if (activeFilter === "media") return Boolean(post.media && post.media.length > 0);
       if (activeFilter === "unclassified") return !classification;
+
       return classification?.classification === activeFilter;
     });
   }, [posts, activeFilter]);
