@@ -29,7 +29,7 @@ type Post = {
   author_name: string | null;
   text: string;
   posted_at: string | null;
-  source_type: "source_account" | "keyword_search" | "yahoo_realtime";
+  source_type: "source_account" | "keyword_search" | "yahoo_realtime" | "x_profile_page";
   source_label: string | null;
   source_url: string | null;
   media: MediaItem[] | null;
