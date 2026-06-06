@@ -2,12 +2,23 @@ import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+type YahooImportMedia = {
+  media_key?: string;
+  type?: "photo";
+  url?: string;
+  preview_image_url?: string | null;
+  video_url?: string | null;
+  width?: number | null;
+  height?: number | null;
+};
+
 type YahooImportPost = {
   text?: string;
   authorHandle?: string;
   authorName?: string;
   postedAt?: string | null;
   url?: string;
+  media?: YahooImportMedia[];
 };
 
 function corsHeaders() {
@@ -108,7 +119,19 @@ export async function POST(request: Request) {
             source_type: "yahoo_realtime",
             source_label: sourceLabel,
             source_url: post.url ?? null,
-            media: [],
+            media: Array.isArray(post.media)
+              ? post.media
+                  .filter((media) => media?.url)
+                  .map((media, index) => ({
+                    media_key: media.media_key ?? `${xPostId}_media_${index}`,
+                    type: "photo",
+                    url: media.url ?? null,
+                    preview_image_url: media.preview_image_url ?? media.url ?? null,
+                    video_url: null,
+                    width: media.width ?? null,
+                    height: media.height ?? null,
+                  }))
+              : [],
             raw: {
               imported_from: "yahoo_realtime",
               url: post.url ?? null,
