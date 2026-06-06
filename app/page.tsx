@@ -29,8 +29,9 @@ type Post = {
   author_name: string | null;
   text: string;
   posted_at: string | null;
-  source_type: "source_account" | "keyword_search";
+  source_type: "source_account" | "keyword_search" | "yahoo_realtime";
   source_label: string | null;
+  source_url: string | null;
   media: MediaItem[] | null;
   is_archived: boolean;
   post_classifications: Classification[] | null;
@@ -88,6 +89,10 @@ function getStatusClass(classification?: Classification) {
 }
 
 function buildXPostUrl(post: Post) {
+  if (post.source_url) {
+    return post.source_url;
+  }
+
   const username = post.author_handle.replace(/^@/, "");
   return `https://x.com/${username}/status/${post.x_post_id}`;
 }

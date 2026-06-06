@@ -107,6 +107,7 @@ export async function POST(request: Request) {
             posted_at: post.postedAt || new Date().toISOString(),
             source_type: "yahoo_realtime",
             source_label: sourceLabel,
+            source_url: post.url ?? null,
             media: [],
             raw: {
               imported_from: "yahoo_realtime",

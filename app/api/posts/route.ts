@@ -13,6 +13,7 @@ export async function GET() {
       posted_at,
       source_type,
       source_label,
+      source_url,
       media,
       is_archived
     `)
