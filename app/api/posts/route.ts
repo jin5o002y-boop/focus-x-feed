@@ -18,7 +18,7 @@ export async function GET() {
       is_archived
     `)
     .order("posted_at", { ascending: false })
-    .limit(200);
+    .limit(1000);
 
   if (postsError) {
     return NextResponse.json({ error: postsError.message }, { status: 500 });

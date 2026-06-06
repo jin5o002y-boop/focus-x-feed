@@ -102,6 +102,8 @@ export default function Home() {
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [isMobileSettingsOpen, setIsMobileSettingsOpen] = useState(false);
+
   const [newType, setNewType] = useState("source_account");
   const [newValue, setNewValue] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -383,15 +385,9 @@ export default function Home() {
         <section className="rounded-3xl bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <p className="text-sm font-semibold text-gray-500">
+              <h1 className="text-4xl font-black tracking-tight md:text-5xl">
                 Focus X Feed
-              </p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight">
-                見たいX投稿だけを集めるフィード
               </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
-                指定アカウント・指定キーワードから投稿を取得し、ミュートワード・ブロック対象・AI判定を通して、不要な投稿を自動で隠します。
-              </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -467,103 +463,106 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
-          <aside className="grid gap-6">
-            <div className="rounded-3xl bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold">設定を追加</h2>
+        <div className="fixed bottom-4 right-4 z-50 lg:hidden">
+          <button
+            onClick={() => setIsMobileSettingsOpen(true)}
+            className="rounded-full bg-black px-5 py-3 text-sm font-bold text-white shadow-lg"
+          >
+            設定
+          </button>
+        </div>
 
-              <div className="mt-5 grid gap-3">
-                <select
-                  value={newType}
-                  onChange={(event) => setNewType(event.target.value)}
-                  className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm"
-                >
-                  {settingTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-
-                <label className="flex items-center gap-2 text-sm font-bold text-gray-600">
-                  <input
-                    type="checkbox"
-                    checked={isBulkMode}
-                    onChange={(event) => setIsBulkMode(event.target.checked)}
-                  />
-                  複数行を一括追加する
-                </label>
-
-                {isBulkMode ? (
-                  <textarea
-                    value={newValue}
-                    onChange={(event) => setNewValue(event.target.value)}
-                    placeholder={"@account1\n@account2\n@account3"}
-                    className="min-h-36 rounded-2xl border border-gray-200 px-4 py-3 text-sm"
-                  />
-                ) : (
-                  <input
-                    value={newValue}
-                    onChange={(event) => setNewValue(event.target.value)}
-                    placeholder="@account または キーワード"
-                    className="rounded-2xl border border-gray-200 px-4 py-3 text-sm"
-                  />
-                )}
-
-                {newType === "target_keyword" ? (
-                  <textarea
-                    value={newDescription}
-                    onChange={(event) => setNewDescription(event.target.value)}
-                    placeholder="キーワードの説明"
-                    className="min-h-24 rounded-2xl border border-gray-200 px-4 py-3 text-sm"
-                  />
-                ) : null}
-
+        {isMobileSettingsOpen ? (
+          <div className="fixed inset-0 z-50 bg-black/40 p-4 lg:hidden">
+            <div className="max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-5 shadow-xl">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold">設定</h2>
                 <button
-                  onClick={addSetting}
-                  disabled={loading || !newValue.trim()}
-                  className="rounded-full bg-black px-5 py-3 text-sm font-bold text-white disabled:opacity-40"
+                  onClick={() => setIsMobileSettingsOpen(false)}
+                  className="rounded-full bg-gray-100 px-4 py-2 text-sm font-bold text-gray-700"
                 >
-                  {isBulkMode ? "一括追加する" : "追加する"}
+                  閉じる
                 </button>
               </div>
-            </div>
 
-            <div className="rounded-3xl bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold">現在の設定</h2>
-
-              <div className="mt-5 grid gap-5 text-sm">
-                <SettingBlock
-                  title="収集対象アカウント"
-                  items={settings?.sourceAccounts ?? []}
-                  field="handle"
-                  type="source_account"
-                  onRemove={removeSetting}
-                />
-                <SettingBlock
-                  title="キーワード"
-                  items={settings?.targetKeywords ?? []}
-                  field="keyword"
-                  type="target_keyword"
-                  onRemove={removeSetting}
-                />
-                <SettingBlock
-                  title="ミュートワード"
-                  items={settings?.muteWords ?? []}
-                  field="word"
-                  type="mute_word"
-                  onRemove={removeSetting}
-                />
-                <SettingBlock
-                  title="ブロック対象"
-                  items={settings?.blockAccounts ?? []}
-                  field="handle"
-                  type="block_account"
-                  onRemove={removeSetting}
-                  max={12}
+              <div className="grid gap-6">
+                <SettingsPanel
+                  settings={settings}
+                  newType={newType}
+                  setNewType={setNewType}
+                  newValue={newValue}
+                  setNewValue={setNewValue}
+                  newDescription={newDescription}
+                  setNewDescription={setNewDescription}
+                  isBulkMode={isBulkMode}
+                  setIsBulkMode={setIsBulkMode}
+                  loading={loading}
+                  addSetting={addSetting}
+                  removeSetting={removeSetting}
                 />
               </div>
             </div>
+          </div>
+        ) : null}
+
+        <div className="fixed bottom-4 right-4 z-50 lg:hidden">
+          <button
+            onClick={() => setIsMobileSettingsOpen(true)}
+            className="rounded-full bg-black px-5 py-3 text-sm font-bold text-white shadow-lg"
+          >
+            設定
+          </button>
+        </div>
+
+        {isMobileSettingsOpen ? (
+          <div className="fixed inset-0 z-50 bg-black/40 p-4 lg:hidden">
+            <div className="max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-5 shadow-xl">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold">設定</h2>
+                <button
+                  onClick={() => setIsMobileSettingsOpen(false)}
+                  className="rounded-full bg-gray-100 px-4 py-2 text-sm font-bold text-gray-700"
+                >
+                  閉じる
+                </button>
+              </div>
+
+              <div className="grid gap-6">
+                <SettingsPanel
+                  settings={settings}
+                  newType={newType}
+                  setNewType={setNewType}
+                  newValue={newValue}
+                  setNewValue={setNewValue}
+                  newDescription={newDescription}
+                  setNewDescription={setNewDescription}
+                  isBulkMode={isBulkMode}
+                  setIsBulkMode={setIsBulkMode}
+                  loading={loading}
+                  addSetting={addSetting}
+                  removeSetting={removeSetting}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
+          <aside className="hidden gap-6 lg:sticky lg:top-6 lg:grid lg:max-h-[calc(100vh-48px)] lg:overflow-y-auto">
+            <SettingsPanel
+              settings={settings}
+              newType={newType}
+              setNewType={setNewType}
+              newValue={newValue}
+              setNewValue={setNewValue}
+              newDescription={newDescription}
+              setNewDescription={setNewDescription}
+              isBulkMode={isBulkMode}
+              setIsBulkMode={setIsBulkMode}
+              loading={loading}
+              addSetting={addSetting}
+              removeSetting={removeSetting}
+            />
           </aside>
 
           <section className="grid gap-4">
@@ -873,3 +872,132 @@ function SettingBlock({
     </div>
   );
 }
+
+function SettingsPanel({
+  settings,
+  newType,
+  setNewType,
+  newValue,
+  setNewValue,
+  newDescription,
+  setNewDescription,
+  isBulkMode,
+  setIsBulkMode,
+  loading,
+  addSetting,
+  removeSetting,
+}: {
+  settings: SettingsResponse | null;
+  newType: string;
+  setNewType: (value: string) => void;
+  newValue: string;
+  setNewValue: (value: string) => void;
+  newDescription: string;
+  setNewDescription: (value: string) => void;
+  isBulkMode: boolean;
+  setIsBulkMode: (value: boolean) => void;
+  loading: boolean;
+  addSetting: () => void;
+  removeSetting: (type: string, id: string) => void;
+}) {
+  return (
+    <>
+      <div className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-bold">設定を追加</h2>
+
+        <div className="mt-5 grid gap-3">
+          <select
+            value={newType}
+            onChange={(event) => setNewType(event.target.value)}
+            className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm"
+          >
+            {settingTypes.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
+          </select>
+
+          <label className="flex items-center gap-2 text-sm font-bold text-gray-600">
+            <input
+              type="checkbox"
+              checked={isBulkMode}
+              onChange={(event) => setIsBulkMode(event.target.checked)}
+            />
+            複数行を一括追加する
+          </label>
+
+          {isBulkMode ? (
+            <textarea
+              value={newValue}
+              onChange={(event) => setNewValue(event.target.value)}
+              placeholder={"@account1\n@account2\n@account3"}
+              className="min-h-36 rounded-2xl border border-gray-200 px-4 py-3 text-sm"
+            />
+          ) : (
+            <input
+              value={newValue}
+              onChange={(event) => setNewValue(event.target.value)}
+              placeholder="@account または キーワード"
+              className="rounded-2xl border border-gray-200 px-4 py-3 text-sm"
+            />
+          )}
+
+          {newType === "target_keyword" ? (
+            <textarea
+              value={newDescription}
+              onChange={(event) => setNewDescription(event.target.value)}
+              placeholder="キーワードの説明"
+              className="min-h-24 rounded-2xl border border-gray-200 px-4 py-3 text-sm"
+            />
+          ) : null}
+
+          <button
+            onClick={addSetting}
+            disabled={loading || !newValue.trim()}
+            className="rounded-full bg-black px-5 py-3 text-sm font-bold text-white disabled:opacity-40"
+          >
+            {isBulkMode ? "一括追加する" : "追加する"}
+          </button>
+        </div>
+      </div>
+
+      <div className="rounded-3xl bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-bold">現在の設定</h2>
+
+        <div className="mt-5 grid gap-5 text-sm">
+          <SettingBlock
+            title="収集対象アカウント"
+            items={settings?.sourceAccounts ?? []}
+            field="handle"
+            type="source_account"
+            onRemove={removeSetting}
+          />
+          <SettingBlock
+            title="キーワード"
+            items={settings?.targetKeywords ?? []}
+            field="keyword"
+            type="target_keyword"
+            onRemove={removeSetting}
+          />
+          <SettingBlock
+            title="ミュートワード"
+            items={settings?.muteWords ?? []}
+            field="word"
+            type="mute_word"
+            onRemove={removeSetting}
+          />
+          <SettingBlock
+            title="ブロック対象"
+            items={settings?.blockAccounts ?? []}
+            field="handle"
+            type="block_account"
+            onRemove={removeSetting}
+            max={12}
+          />
+        </div>
+      </div>
+    </>
+  );
+}
+
